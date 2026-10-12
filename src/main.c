@@ -432,10 +432,10 @@ static void poll_fetch(void)
     if (r == NET_DONE && weather_parse(&nw, net_body, cfg.imperial, cfg.lang)) {
         wd = nw;
         have_data = 1;
-        t = Tgettime();
-        sprintf(status, "%s %02u:%02u", T->updated, t >> 11, t >> 5 & 63);
+        t = (unsigned)Tgettime() & 0xffff;     /* TOS: only the low word is the time */
+        sprintf(status, "%s %02u:%02u", T->updated, t >> 11 & 31, t >> 5 & 63);
         if ((short)strlen(status) * cw > b_refresh.g_x - 2 * P)
-            sprintf(status, "%02u:%02u", t >> 11, t >> 5 & 63);
+            sprintf(status, "%02u:%02u", t >> 11 & 31, t >> 5 & 63);
     } else if (r == NET_DONE) {
         set_error(T->bad_answer);
     } else if (net_error_kind == NE_HTTP && net_body && strstr(net_body, "not found")) {
