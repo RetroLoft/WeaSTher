@@ -1,0 +1,2 @@
+src/*.o
+test/parsetest
