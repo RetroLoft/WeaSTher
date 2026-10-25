@@ -99,8 +99,9 @@ static void hline(short y)
     v_pline(vh, 2, p);
 }
 
-/* n-th line (0-based) of s word-wrapped at cols; the last line is cut */
-static void wrap_line(const char *s, int cols, int n, int last, char *out)
+/* n-th line (0-based) of s word-wrapped at cols; the last line drops
+   the words that do not fit */
+static void wrap_line(const char *s, int cols, int n, char *out)
 {
     int line = 0;
     for (;;) {
@@ -110,7 +111,7 @@ static void wrap_line(const char *s, int cols, int n, int last, char *out)
             if (cut == 0) cut = cols;
         }
         if (line == n) {
-            clip(out, s, line == last ? (len < cols ? len : cols) : cut);
+            clip(out, s, cut);
             return;
         }
         s += cut;
@@ -158,11 +159,11 @@ static void layout(void)
     text_cols = 27;
     W = text_x + text_cols * cw + P;
     col_w = (W - 2 * P) / 3;
-    desc_lines = ch >= 16 ? 2 : 1;
+    desc_lines = 2;
     sun_line = 1;
 
     /* drop the less important lines until the window fits on the screen */
-    for (n = 0; n < 3; n++) {
+    for (n = 0; n < 4; n++) {
         y_title = P / 2;
         y_cur = y_title + ch + P / 2;
         cur_h = big_ch + (5 + sun_line) * ch;
@@ -177,8 +178,8 @@ static void layout(void)
         wind_calc(WC_BORDER, WKIND, 0, 0, W, H, &b.g_x, &b.g_y, &b.g_w, &b.g_h);
         max_h = desk.g_h;
         if (b.g_h <= max_h) break;
-        if (desc_lines) desc_lines--;
-        else sun_line = 0;
+        if (sun_line) sun_line = 0;
+        else if (desc_lines) desc_lines--;
     }
 }
 
@@ -264,7 +265,7 @@ static void draw_current(void)
 static void draw_forecast(void)
 {
     char buf[64];
-    int i, l, cols = col_w / cw - 1;
+    int i, l, cols = col_w / cw;
 
     for (i = 0; i < wd.ndays && i < 3; i++) {
         const DAY *d = &wd.day[i];
@@ -281,7 +282,7 @@ static void draw_forecast(void)
         text_center(x, col_w, y, clip(buf, buf, cols), 0);
         y += ch;
         for (l = 0; l < desc_lines; l++, y += ch) {
-            wrap_line(d->desc, cols, l, desc_lines - 1, buf);
+            wrap_line(d->desc, cols, l, buf);
             text_center(x, col_w, y, buf, 0);
         }
     }
@@ -432,10 +433,15 @@ static void poll_fetch(void)
     if (r == NET_DONE && weather_parse(&nw, net_body, cfg.imperial, cfg.lang)) {
         wd = nw;
         have_data = 1;
-        t = (unsigned)Tgettime() & 0xffff;     /* TOS: only the low word is the time */
-        sprintf(status, "%s %02u:%02u", T->updated, t >> 11 & 31, t >> 5 & 63);
-        if ((short)strlen(status) * cw > b_refresh.g_x - 2 * P)
-            sprintf(status, "%02u:%02u", t >> 11 & 31, t >> 5 & 63);
+        /* TOS: only the low words hold the time and date */
+        t = (unsigned)Tgettime() & 0xffff;
+        if (((unsigned)Tgetdate() & 0xffff) >> 9 < 2020 - 1980) {
+            strcpy(status, T->updated);        /* clock not set: no time */
+        } else {
+            sprintf(status, "%s %02u:%02u", T->updated, t >> 11 & 31, t >> 5 & 63);
+            if ((short)strlen(status) * cw > b_refresh.g_x - 2 * P)
+                sprintf(status, "%02u:%02u", t >> 11 & 31, t >> 5 & 63);
+        }
     } else if (r == NET_DONE) {
         set_error(T->bad_answer);
     } else if (net_error_kind == NE_HTTP && net_body && strstr(net_body, "not found")) {
