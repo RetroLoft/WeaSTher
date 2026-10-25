@@ -5,6 +5,8 @@ A small weather gadget for the Atari ST. It fetches the weather from
 and shows it in a GEM window: current weather with a big icon, and a
 three-day forecast.
 
+![WeaSTher in ST low resolution](docs/screenshot-low.png)
+
 - Works in ST low (16 colours), medium (4 colours) and high resolution (mono).
   The icons are drawn with VDI calls (sun, clouds, rain, snow, sleet,
   thunder, fog), so they scale to each resolution and its pixel aspect.
